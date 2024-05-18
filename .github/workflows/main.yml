@@ -1,0 +1,74 @@
+name: Build, Static Analysis, and Code Coverage
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build_static_analysis_and_code_coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up JDK 1.8
+        uses: actions/setup-java@v1
+        with:
+          java-version: 1.8
+      - name : Clean for start
+        run: |
+          git config --global user.name "Matteo Gerardin"
+          git config --global user.email "161850422+IlGera@users.noreply.github.com"
+          git pull
+          rm README.md
+          git add -A
+          git commit -m "Clean for start"
+          git push
+      - name: Prepare README.md
+        run: |
+          echo "<h3>RESULTS " > README.md
+          TZ="Europe/Rome" date >> README.md
+          echo "</h3>" >> README.md
+      - name: Build maven project
+        run: |
+          cd roman-number
+          mvn clean install -Dcheckstyle.skip=true
+      - name: Publication of build results ok
+        if: success()
+        run: |
+          echo "BUILD SUCCESS<br>" >> ./README.md
+          echo "TOTAL CODE COVERED: " >> ./README.md
+          # formula used to calculate code coverage
+          awk -F, '{ i += $4 + $5;ic += $5;b += $6 + $7; bc += $7;l += $8 + $9;lc += $9;c += $10 + $11;cc +=$11;m += $12 + $13;mc += $13 } END { print ((100 * ic / i) + (100 * bc / b) + (100 * lc / l) + (100 * cc / c) + (100 * mc / m)) / 5, "%<br>"}' roman-number/target/site/jacoco/jacoco.csv >> ./README.md      
+      - name: Publication of build results error
+        if: failure()
+        run: |
+         echo "BUILD FAILURE<br>" >> ./README.md
+    
+      - name: Start checkstyle
+        if: always()
+        run: |
+          echo "<hr/>"
+          echo "CHECKSTYLE: " >> ./README.md
+          cd roman-number
+          mvn checkstyle:check
+      - name: Publication of checkstyle results
+        if: always()
+        run: |
+          cd roman-number
+          if  grep -q '\[ERROR\]' <(mvn checkstyle:check) ; then
+            echo "THERE ARE ERRORS REPORTED BY CHECKSTYLE WITH checkstyle.xml RULESET." >> ../README.md
+          else
+            echo "YOU HAVE NO CHECKSTYLE VIOLATION" >> ../README.md
+            fi
+      - name: Edit and push README file
+        if: always()
+        run: |
+          git config --global user.name "Matteo Gerardin"
+          git config --global user.email "161850422+IlGera@users.noreply.github.com"
+          git pull
+          cd roman-number
+          mvn clean
+          cd ..
+          git add README.md
+          git commit -m "Build, Static Analysis, and Code Coverage"
+          git push
